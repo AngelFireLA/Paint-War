@@ -2,7 +2,7 @@ import pygame, numpy as np
 
 pygame.init()
 
-player_image = pygame.image.load("image/default bucket.png")
+player_image = pygame.image.load("images/default bucket.png")
 
 player_array = pygame.surfarray.array3d(player_image)
 

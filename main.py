@@ -1,16 +1,22 @@
+import os
+import time
+
+import numpy as np
 import pygame
+from PIL import Image
 
 pygame.init()
 width, height = 1000, 1000
 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
 pygame.display.set_caption("Paint War")
 
-background_image = pygame.image.load("image/gradient_background.png")  # image is 1000x1000
+background_image = pygame.image.load("images/gradient_background.png")  # images is 1000x1000
 
-color_dict = {"black": (0, 0, 0), "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255),
-              "yellow": (255, 255, 0), "magenta": (255, 0, 255), "cyan": (0, 255, 255), "white": (255, 255, 255),
-              "gray": (128, 128, 128), "light gray": (192, 192, 192), "dark gray": (64, 64, 64),
-              "light red": (255, 64, 64), "light green": (64, 255, 64)}
+color_dict = {"black": [0, 0, 0], "red": [255, 0, 0], "green": [0, 255, 0], "blue": [0, 0, 255],
+              "yellow": [255, 255, 0], "magenta": [255, 0, 255], "cyan": [0, 255, 255], "white": [255, 255, 255],
+              "gray": [128, 128, 128], "light gray": [192, 192, 192], "dark gray": [64, 64, 64],
+              "light red": [255, 64, 64], "light green": [64, 255, 64]}
+
 
 GRID_SIZE = 8
 GRID_SQUARE_SIZE = 80
@@ -46,8 +52,12 @@ class Player:
         self.color = color
         self.score = 0
         self.x, self.y = x, y
+    def __repr__(self):
+        return f"Player({self.name}, {self.color}, {self.x}, {self.y})"
 
-
+def lighten_color(color, amount=200):
+    r = [x + (amount * (255 - x)) // 255 for x in color]
+    return r
 def draw_grid(game):
     grid_x = (width - GRID_SIZE * GRID_SQUARE_SIZE) // 2
     grid_y = (height - GRID_SIZE * GRID_SQUARE_SIZE) // 2
@@ -63,11 +73,10 @@ def draw_grid(game):
             square_y = grid_y + row * GRID_SQUARE_SIZE
 
             # Draw the square with a black border
-            pygame.draw.rect(screen, color_dict[game.grid[row][col].color],
+            pygame.draw.rect(screen, lighten_color(color_dict[game.grid[row][col].color]),
                              (square_x, square_y, GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
             pygame.draw.rect(screen, color_dict["black"],
                              (square_x, square_y, GRID_SQUARE_SIZE, GRID_SQUARE_SIZE), 1)
-
 
 def place_text(x, y, text, size, color=None):
     font = pygame.font.Font(pygame.font.get_default_font(), size)
@@ -78,21 +87,48 @@ def place_text(x, y, text, size, color=None):
     screen.blit(text, text.get_rect(center=(x, y)))
 
 
-def square_to_pos(row, col, game):
-    grid_x = (width - game.grid_size * game.grid_square_size) // 2
-    grid_y = (height - game.grid_size * game.grid_square_size) // 2
+def square_to_pos(row, col):
+    grid_x = (width - GRID_SIZE * GRID_SQUARE_SIZE) // 2
+    grid_y = (height - GRID_SIZE * GRID_SQUARE_SIZE) // 2
 
-    square_x = grid_x + col * game.grid_square_size
-    square_y = grid_y + row * game.grid_square_size
+    square_x = grid_x + col * GRID_SQUARE_SIZE
+    square_y = grid_y + row * GRID_SQUARE_SIZE
 
-    center_x = square_x + game.grid_square_size // 2
-    center_y = square_y + game.grid_square_size // 2
+    center_x = square_x + GRID_SQUARE_SIZE // 2
+    center_y = square_y + GRID_SQUARE_SIZE // 2
 
     return center_x, center_y
 
 
+def make_new_player_image(player):
+    start_time = time.time()
+    img = Image.open("images/default bucket.png")
+
+    new_color = (color_dict[player.color][0], color_dict[player.color][1],
+                 color_dict[player.color][2])  # (R,G,B) No alpha information here
+
+    img = img.convert("RGBA")
+
+    data = np.array(img)  # "data" is a height x width x 4 numpy array
+    red, green, blue, alpha = data.T  # Temporarily unpack the bands for readability
+
+    # Replace white and white-ish pixels with new_color
+    white_areas = (red > 254) & (blue > 254) & (green > 254)
+    data[..., :3][white_areas.T] = new_color  # Sets RGB values, leaves alpha value unchanged
+
+    img = Image.fromarray(data)
+    img.save("images/" + str(player.name) + ".png")
+
+    print(time.time() - start_time)
+
+
 def start_game():
     global screen, width, height
+
+    loading_image = pygame.image.load("images/loading.png")
+    loading_image = pygame.transform.scale(loading_image, (width, height))
+    screen.blit(loading_image, (0, 0))
+    pygame.display.flip()
     game = Game()
     player1 = Player("Player 1", "red",0, 0)
     player2 = Player("Player 2", "blue", 0, GRID_SIZE-1)
@@ -106,11 +142,17 @@ def start_game():
     game.grid[0][GRID_SIZE-1].color = player2.color
     game.grid[GRID_SIZE - 1][0].color = player3.color
     game.grid[GRID_SIZE - 1][GRID_SIZE - 1].color = player4.color
+    make_new_player_image(player1)
+    make_new_player_image(player2)
+    make_new_player_image(player3)
+    make_new_player_image(player4)
 
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                for player in game.players:
+                    os.remove("images/"+str(player.name)+".png")
                 pygame.quit()
                 quit()
             elif event.type == pygame.VIDEORESIZE:
@@ -120,6 +162,13 @@ def start_game():
 
         screen.blit(pygame.transform.scale(background_image, (width, height)), (0, 0))
         draw_grid(game)
+        for player in game.players:
+            p_image = pygame.image.load("images/"+str(player.name)+".png").convert_alpha()
+            p_image = pygame.transform.scale(p_image, (GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
+            p_rect = p_image.get_rect()
+            p_rect.centerx, p_rect.centery = square_to_pos(player.x, player.y)
+            screen.blit(p_image, p_rect)
+
         pygame.display.flip()
 
 
