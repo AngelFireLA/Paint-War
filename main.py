@@ -55,7 +55,14 @@ class Player:
     def __repr__(self):
         return f"Player({self.name}, {self.color}, {self.x}, {self.y})"
 
-def lighten_color(color, amount=200):
+    def move(self, x, y, game):
+        if 0<=x+self.x<=7:
+            self.x+=x
+        if 0<=y+self.y<=7:
+            self.y+=y
+        game.grid[self.y][self.x].color = self.color
+
+def lighten_color(color, amount=100):
     r = [x + (amount * (255 - x)) // 255 for x in color]
     return r
 def draw_grid(game):
@@ -63,8 +70,8 @@ def draw_grid(game):
     grid_y = (height - GRID_SIZE * GRID_SQUARE_SIZE) // 2
 
     place_text(grid_x - int(GRID_SQUARE_SIZE/2), grid_y - int(GRID_SQUARE_SIZE/2), game.players[0].name, 25, color_dict["black"])
-    place_text(grid_x + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), grid_y - int(GRID_SQUARE_SIZE/2), game.players[1].name, 25, color_dict["black"])
-    place_text(grid_x - int(GRID_SQUARE_SIZE/2), grid_y + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), game.players[2].name, 25, color_dict["black"])
+    place_text(grid_x - int(GRID_SQUARE_SIZE/2), grid_y + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), game.players[1].name, 25, color_dict["black"])
+    place_text(grid_x + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), grid_y - int(GRID_SQUARE_SIZE/2), game.players[2].name, 25, color_dict["black"])
     place_text(grid_x + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), grid_y + GRID_SIZE * GRID_SQUARE_SIZE + int(GRID_SQUARE_SIZE/2), game.players[3].name, 25, color_dict["black"])
 
     for row in range(GRID_SIZE):
@@ -87,7 +94,7 @@ def place_text(x, y, text, size, color=None):
     screen.blit(text, text.get_rect(center=(x, y)))
 
 
-def square_to_pos(row, col):
+def square_to_pos(col, row):
     grid_x = (width - GRID_SIZE * GRID_SQUARE_SIZE) // 2
     grid_y = (height - GRID_SIZE * GRID_SQUARE_SIZE) // 2
 
@@ -101,7 +108,6 @@ def square_to_pos(row, col):
 
 
 def make_new_player_image(player):
-    start_time = time.time()
     img = Image.open("images/default bucket.png")
 
     new_color = (color_dict[player.color][0], color_dict[player.color][1],
@@ -118,8 +124,6 @@ def make_new_player_image(player):
 
     img = Image.fromarray(data)
     img.save("images/" + str(player.name) + ".png")
-
-    print(time.time() - start_time)
 
 
 def start_game():
@@ -139,8 +143,8 @@ def start_game():
     game.players.append(player3)
     game.players.append(player4)
     game.grid[0][0].color = player1.color
-    game.grid[0][GRID_SIZE-1].color = player2.color
-    game.grid[GRID_SIZE - 1][0].color = player3.color
+    game.grid[GRID_SIZE-1][0].color = player2.color
+    game.grid[0][GRID_SIZE - 1].color = player3.color
     game.grid[GRID_SIZE - 1][GRID_SIZE - 1].color = player4.color
     make_new_player_image(player1)
     make_new_player_image(player2)
@@ -159,6 +163,16 @@ def start_game():
                 # Handle window resize
                 width, height = event.size
                 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    player1.move(0, y=-1, game=game)
+                elif event.key == pygame.K_DOWN:
+                    player1.move(0, 1, game=game)
+                elif event.key == pygame.K_LEFT:
+                    player1.move(-1, 0, game=game)
+                elif event.key == pygame.K_RIGHT:
+                    player1.move(1, 0, game=game)
+
 
         screen.blit(pygame.transform.scale(background_image, (width, height)), (0, 0))
         draw_grid(game)
