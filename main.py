@@ -20,6 +20,7 @@ color_dict = {"black": [0, 0, 0], "red": [255, 0, 0], "green": [0, 255, 0], "blu
 
 GRID_SIZE = 8
 GRID_SQUARE_SIZE = 80
+clock = pygame.time.Clock()
 
 def show_grid(grid):
     for line in grid:
@@ -47,20 +48,47 @@ class Square:
 
 
 class Player:
+    MOVEMENT_COOLDOWN = 10
     def __init__(self, name, color, x, y):
         self.name = name
         self.color = color
         self.score = 0
         self.x, self.y = x, y
+        self.time_since_last_movement = 0
+        self.img = None
+
     def __repr__(self):
         return f"Player({self.name}, {self.color}, {self.x}, {self.y})"
 
+
+    def try_to_move(self, game, delta_time):
+        self.time_since_last_movement+=delta_time
+        if self.time_since_last_movement >= self.MOVEMENT_COOLDOWN:
+            self.time_since_last_movement = 0
+            keys = pygame.key.get_pressed()
+            move_multiplier = 1
+
+            if keys[pygame.K_UP]:
+                self.move(0, y=-10*move_multiplier, game=game)
+            elif keys[pygame.K_DOWN]:
+                self.move(0, 10*move_multiplier, game=game)
+            elif keys[pygame.K_LEFT]:
+                self.move(-10*move_multiplier, 0, game=game)
+            elif keys[pygame.K_RIGHT]:
+                self.move(10*move_multiplier, 0, game=game)
+
+
     def move(self, x, y, game):
-        if 0<=x+self.x<=7:
-            self.x+=x
-        if 0<=y+self.y<=7:
-            self.y+=y
-        game.grid[self.y][self.x].color = self.color
+        if self.x + x < col_to_x(0) or self.x + x > col_to_x(GRID_SIZE - 1) or \
+                self.y + y < row_to_y(0) or self.y + y > row_to_y(GRID_SIZE - 1):
+            return
+
+        self.x += x
+        self.y += y
+
+        grid_x, grid_y = pos_to_square(self.x-(self.img.get_width()/5), self.y+(self.img.get_height()/5))
+
+        game.grid[grid_y][grid_x].color = self.color
 
 def lighten_color(color, amount=100):
     r = [x + (amount * (255 - x)) // 255 for x in color]
@@ -95,16 +123,30 @@ def place_text(x, y, text, size, color=None):
 
 
 def square_to_pos(col, row):
-    grid_x = (width - GRID_SIZE * GRID_SQUARE_SIZE) // 2
-    grid_y = (height - GRID_SIZE * GRID_SQUARE_SIZE) // 2
-
-    square_x = grid_x + col * GRID_SQUARE_SIZE
-    square_y = grid_y + row * GRID_SQUARE_SIZE
-
-    center_x = square_x + GRID_SQUARE_SIZE // 2
-    center_y = square_y + GRID_SQUARE_SIZE // 2
-
+    center_x = (((width - GRID_SIZE * GRID_SQUARE_SIZE) // 2) + col * GRID_SQUARE_SIZE)+GRID_SQUARE_SIZE // 2
+    center_y = (((height - GRID_SIZE * GRID_SQUARE_SIZE) // 2) + row * GRID_SQUARE_SIZE) + GRID_SQUARE_SIZE // 2
     return center_x, center_y
+
+def col_to_x(col):
+    square_x = ((width - GRID_SIZE * GRID_SQUARE_SIZE) // 2) + col * GRID_SQUARE_SIZE
+    return square_x + GRID_SQUARE_SIZE // 2
+
+def row_to_y(row):
+    square_y = ((height - GRID_SIZE * GRID_SQUARE_SIZE) // 2) + row * GRID_SQUARE_SIZE
+    return square_y + GRID_SQUARE_SIZE // 2
+
+def pos_to_square(x, y):
+    grid_x = (x - (width - GRID_SIZE * GRID_SQUARE_SIZE) / 2) / GRID_SQUARE_SIZE
+    grid_y = (y - (height - GRID_SIZE * GRID_SQUARE_SIZE) / 2) / GRID_SQUARE_SIZE
+    return int(grid_x), int(grid_y)
+
+def x_to_col(x):
+    grid_x = (x - (width - GRID_SIZE * GRID_SQUARE_SIZE) / 2) / GRID_SQUARE_SIZE
+    return int(grid_x)
+
+def y_to_row(y):
+    grid_y = (y - (height - GRID_SIZE * GRID_SQUARE_SIZE) / 2) / GRID_SQUARE_SIZE
+    return int(grid_y)
 
 
 def make_new_player_image(player):
@@ -124,6 +166,8 @@ def make_new_player_image(player):
 
     img = Image.fromarray(data)
     img.save("images/" + str(player.name) + ".png")
+    player.img = pygame.image.load("images/" + str(player.name) + ".png").convert_alpha()
+
 
 
 def start_game():
@@ -134,10 +178,10 @@ def start_game():
     screen.blit(loading_image, (0, 0))
     pygame.display.flip()
     game = Game()
-    player1 = Player("Player 1", "red",0, 0)
-    player2 = Player("Player 2", "blue", 0, GRID_SIZE-1)
-    player3 = Player("Player 3", "green", GRID_SIZE-1, 0)
-    player4 = Player("Player 4", "yellow", GRID_SIZE-1, GRID_SIZE-1)
+    player1 = Player("Player 1", "red", col_to_x(0), row_to_y(0))
+    player2 = Player("Player 2", "blue", col_to_x(0), row_to_y(GRID_SIZE-1))
+    player3 = Player("Player 3", "green", col_to_x(GRID_SIZE-1), row_to_y(0))
+    player4 = Player("Player 4", "yellow", col_to_x(GRID_SIZE-1), row_to_y(GRID_SIZE-1))
     game.players.append(player1)
     game.players.append(player2)
     game.players.append(player3)
@@ -153,6 +197,7 @@ def start_game():
 
 
     while True:
+        delta_time = clock.tick(60)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 for player in game.players:
@@ -163,25 +208,18 @@ def start_game():
                 # Handle window resize
                 width, height = event.size
                 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP:
-                    player1.move(0, y=-1, game=game)
-                elif event.key == pygame.K_DOWN:
-                    player1.move(0, 1, game=game)
-                elif event.key == pygame.K_LEFT:
-                    player1.move(-1, 0, game=game)
-                elif event.key == pygame.K_RIGHT:
-                    player1.move(1, 0, game=game)
 
+        player1.try_to_move(game, delta_time)
 
         screen.blit(pygame.transform.scale(background_image, (width, height)), (0, 0))
         draw_grid(game)
         for player in game.players:
-            p_image = pygame.image.load("images/"+str(player.name)+".png").convert_alpha()
-            p_image = pygame.transform.scale(p_image, (GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
-            p_rect = p_image.get_rect()
-            p_rect.centerx, p_rect.centery = square_to_pos(player.x, player.y)
-            screen.blit(p_image, p_rect)
+            player.image = pygame.transform.scale(player.img, (GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
+
+            p_rect = player.image.get_rect()
+            p_rect.centerx, p_rect.centery = player.x, player.y
+            screen.blit(player.image, p_rect)
+
 
         pygame.display.flip()
 
