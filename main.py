@@ -85,6 +85,17 @@ class Player:
 
         self.x += x
         self.y += y
+        for player in game.players:
+            self.image = pygame.transform.scale(self.img, (GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
+            p_rect = self.image.get_rect()
+            p_rect.centerx, p_rect.centery = self.x, self.y
+            player.img = pygame.transform.scale(player.img, (GRID_SQUARE_SIZE, GRID_SQUARE_SIZE))
+            e_rect = player.img.get_rect()
+            e_rect.centerx, e_rect.centery = player.x, player.y
+            if p_rect.colliderect(e_rect):
+                self.x -= x
+                self.y -= y
+                return
 
         grid_x, grid_y = pos_to_square(self.x-(self.img.get_width()/5), self.y+(self.img.get_height()/5))
 
